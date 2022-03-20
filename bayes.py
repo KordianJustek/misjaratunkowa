@@ -53,14 +53,14 @@ class Search():
 
         cv.imshow('Obszary do przeszukania',self.img)
         cv.moveWindow('Obszary do przeszukania', 750,10)
-        cv.waitKey(50000)
+        cv.waitKey(1500)
 
     def salior_final_location(self,num_search_areas):
         #zwraca wspołrzedne zeglarza wzgledem podtablicy obszaru poszukiwan
-        self.salior_actual[0] = np.random.choice(self.sal.shape[1],1)
-        self.salior_actual[1] = np.random.choice(self.sal.shape[0],1)
+        self.salior_actual[0] = np.random.choice(self.sa1.shape[1],1)
+        self.salior_actual[1] = np.random.choice(self.sa1.shape[0],1)
 
-        area = int random.triangular(1,num_search_areas +1)
+        area = int(random.triangular(1,num_search_areas +1))
 
         if area == 1:
             x = self.salior_actual[0] + SA1_CORNERS[0]
@@ -77,10 +77,122 @@ class Search():
 
         return x,y
 
+    def calc_search_effectiveness(self):
+        self.sep1 = random.uniform(0.2,0.9)
+        self.sep2 = random.uniform(0.2, 0.9)
+        self.sep3 = random.uniform(0.2, 0.9)
 
+    def conduct_search(self,area_num, area_array,effectivness_prob):
+        local_y_range = range(area_array.shape[0])
+        local_x_range = range(area_array.shape[1])
+        coords = list(itertools.product(local_x_range,local_y_range))
+        random.shuffle(coords)
+        coords = coords[:int((len(coords) * effectivness_prob))]
+        loc_actual = (self.salior_actual[0],self.salior_actual[1])
+        if area_num == self.area_actual and loc_actual in coords:
+            return 'Znaleziono w obszare nr {}'.format(area_num),coords
+        else:
+            return 'Nie znaleziono', coords
 
+    def revise_target_probs(self):
+        denom = self.p1 * (1-self.sep1) + self.p2 * (1-self.sep2) + self.p3 * (1-self.sep3)
+        self.p1 = self.p1 * (1-self.sep1) / denom
+        self.p2 = self.p2 * (1 - self.sep2) / denom
+        self.p3 = self.p3 * (1 - self.sep3) / denom
 
+def draw_menu(serch_num):
+    print('\nPodejscie nr {} '.format(serch_num))
+    print(
+        """
+        Wbierz nastepne obszary do przeszukiwania:
+        
+        0 - Wyjdz z programu
+        1 - Przeszukaj dwukrotnie obszar pierwszy
+        2 - Przeszukaj dwukrotnie obszar drugi
+        3 - Przeszukaj dwukrotnie obszar trzeci
+        4 - Przeszukaj obszar pierwszy i drugi
+        5 - Przeszukaj obszar pierwszy i trzeci
+        6 - Przeszukaj obszary drugi i trzeci
+        7 - Zacznij od poczatku
+        """
+    )
 
+def main():
+    app = Search('Cape_Python')
+    app.draw_map(last_know=(160,290))
+    salior_x, salior_y = app.salior_final_location(num_search_areas=3)
+    print("-" * 65)
+    print("\nPoczątkowe oszacowanie prawdopodobienstawa (P):")
+    print("P1 = {:.3f}, P2 = {:.3f}, P3 = {:.3f}".format(app.p1,app.p2,app.p3 ))
+    search_num = 1
+    while True:
+        app.calc_search_effectiveness()
+        draw_menu(search_num)
+        choice = input('Wybierz opcje: ')
 
-a = Search('Kordian')
-a.draw_map((1,1))
+        if choice == "0":
+            sys.exit()
+
+        elif choice =='1':
+            result_1, coords_1 = app.conduct_search(1,app.sa1,app.sep1)
+            result_2, coords_2 = app.conduct_search(1,app.sa1,app.sep1)
+            app.sep1 = (len(set(coords_1+coords_2))) / (len(app.sa1)**2 )
+            app.sep2 = 0
+            app.sep3 = 0
+
+        elif choice == '2':
+            result_1, coords_1 = app.conduct_search(2, app.sa2, app.sep2)
+            result_2, coords_2 = app.conduct_search(2, app.sa2, app.sep2)
+            app.sep1 = 0
+            app.sep2 = (len(set(coords_1 + coords_2))) / (len(app.sa2)**2)
+            app.sep3 = 0
+
+        elif choice == '3':
+            result_1, coords_1 = app.conduct_search(3, app.sa3, app.sep3)
+            result_2, coords_2 = app.conduct_search(3, app.sa3, app.sep3)
+            app.sep1 = 0
+            app.sep2 = 0
+            app.sep3 = (len(set(coords_1 + coords_2))) / (len(app.sa3) ** 2)
+
+        elif choice == '4':
+            result_1, coords_1 = app.conduct_search(1, app.sa1, app.sep1)
+            result_2, coords_2 = app.conduct_search(2, app.sa2, app.sep2)
+            app.sep3 = 0
+
+        elif choice == '5':
+            result_1, coords_1 = app.conduct_search(1, app.sa1, app.sep1)
+            result_2, coords_2 = app.conduct_search(3, app.sa3, app.sep3)
+            app.sep2 = 0
+
+        elif choice == '6':
+            result_1, coords_1 = app.conduct_search(2, app.sa2, app.sep2)
+            result_2, coords_2 = app.conduct_search(3, app.sa3, app.sep3)
+            app.sep1 = 0
+
+        elif choice == '7':
+            main()
+
+        else:
+            print('n\ To nie jest poprawny wybór.', file=sys.stderr)
+            continue
+
+        app.revise_target_probs()
+
+        print('\nPodejscie nr {} - wynik 1: {}'.format(search_num,result_1), file=sys.stderr )
+        print('Podejscie nr {} - wynik 2: {}\n'.format(search_num,result_2), file=sys.stderr)
+        print("Skutecznosc poszukiwań (E) dla podejscia nr {}: ".format(search_num))
+        print("E1 = {:.3f}, E2 = {:.3f}, E3 = {:.3f} ".format(app.sep1,app.sep2,app.sep3))
+
+        if result_1 == 'Nie znaleziono' and result_2 == 'Nie znaleziono':
+            print("\nNowe oszacowanie prawdopodobienstwa (P) "
+                  "dla podejscia nr {}:".format(search_num+1))
+            print("P1 = {:.3f}, P2 = {:.3f}, P3 = {:.3f}".format(app.p1,app.p2,app.p3))
+        else:
+            cv.circle(app.img, (salior_x[0],salior_y[0]),3,(255,0,0),-1 )
+            cv.imshow('Obszar do przeszukania',app.img)
+            cv.waitKey(1500)
+            main()
+        search_num +=1
+
+if __name__ == '__main__':
+    main()
